@@ -1,0 +1,60 @@
+# =============================================================================
+# Semantic Hybrid Router — Dependencies
+# =============================================================================
+# Install with: pip install -r requirements.txt
+
+
+
+# ── Phase 1: Data Ingestion ───────────────────────────────────────────────────
+# datasets  : HuggingFace library to stream & cache the Bitext dataset
+# pandas    : DataFrame manipulation for filtering & saving our training set
+# numpy     : Numerical arrays — the lingua franca between PyTorch & Scikit-learn
+datasets>=2.14.0
+pandas>=2.1.0
+numpy>=1.26.0
+
+
+# ── Phase 2: Deep Learning / Embedding Extraction ────────────────────────────
+# torch        : The PyTorch runtime — runs the transformer's forward pass locally
+# transformers : HuggingFace model hub — loads all-MiniLM-L6-v2 weights & tokenizer
+# sentence-transformers: Higher-level wrapper we install now, reference in Phase 2
+#                        (we'll use the raw transformers API to learn the internals)
+torch>=2.1.0
+transformers>=4.36.0
+sentence-transformers>=2.3.1
+
+
+# ── Phase 3: Machine Learning Classification ─────────────────────────────────
+# scikit-learn : K-Means clustering + DBSCAN anomaly detection
+# joblib       : Serialize (save/load) trained Scikit-learn models as .pkl files
+scikit-learn>=1.3.0
+joblib>=1.3.0
+
+
+# ── Phase 4: Agentic Orchestration ───────────────────────────────────────────
+# langchain        : Core chains, agents, and the create_tool_calling_agent construct
+# langchain-core   : Shared primitives (messages, runnables) used across the ecosystem
+# langchain-community : Community integrations (SQLite, etc.)
+# langchain-openrouter : Work with OpenRouter API and LLM model
+# langgraph        : State machine framework for building the conditional routing graph
+langchain>=0.2.0
+langchain-core>=0.2.0
+langchain-community>=0.2.0
+langchain-openrouter>=0.2.0
+langgraph>=0.2.0
+
+
+# ── Phase 5: API Wrapper ──────────────────────────────────────────────────────
+# fastapi          : The web framework that wraps our pipeline in a REST endpoint
+# uvicorn[standard]: ASGI server that actually runs FastAPI (with websocket support)
+# pydantic         : Data validation for our API request/response schemas
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.4.0
+
+
+# ── Utilities (all phases) ────────────────────────────────────────────────────
+# python-dotenv : Loads .env file into os.environ (keeps API keys out of code)
+# httpx         : Async HTTP client used internally by LangChain's OpenRouter calls
+python-dotenv>=1.0.0
+httpx>=0.25.0
