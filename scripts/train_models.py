@@ -41,7 +41,12 @@ NPZ_PATH   = DATA_DIR / "training_data.npz"
 
 # DBSCAN calibration parameters — adjust these if outlier rate is off
 MIN_SAMPLES    = 5   # minimum neighborhood density for a core point
-EPS_PERCENTILE = 95  # use the 95th percentile of k-NN distances as eps
+EPS_PERCENTILE = 99  # raised from 95 after diagnosing that the get_refund
+                     # cluster's training vocabulary ("compensation of my money",
+                     # "restitution") is structurally different from natural user
+                     # phrasing — the 95th percentile boundary was too tight to
+                     # cover legitimate refund queries (min core sample distance
+                     # 0.7208 vs eps 0.6185 at 95th percentile).
 
 
 # =============================================================================

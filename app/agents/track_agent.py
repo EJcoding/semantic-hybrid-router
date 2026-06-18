@@ -11,8 +11,7 @@ CALLED BY: LangGraph state machine (Phase 4b) when result.intent == "track_order
 """
 
 from dotenv import load_dotenv
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain.agents import create_agent
 from app.llm_config import get_llm
 from app.tools.sqlite_tools import track_order
 
@@ -27,34 +26,23 @@ Instructions:
 - Call track_order with that order ID.
 - If no order ID is in the message, politely ask the customer to provide it.
 - Be informative, friendly, and concise.
+- Respond in plain conversational text — no markdown (no bold, bullet points, or headers).
 - Do not handle cancellations, refunds, or any other topics."""
 
-_executor: AgentExecutor | None = None
+_agent = None
 
 
-def _get_executor() -> AgentExecutor:
-    global _executor
-    if _executor is not None:
-        return _executor
+def _get_agent():
+    global _agent
+    if _agent is not None:
+        return _agent
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
-
-    tools = [track_order]
-    agent = create_tool_calling_agent(get_llm(), tools, prompt)
-
-    _executor = AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=False,
-        handle_parsing_errors=True,
-        max_iterations=5,
-        return_intermediate_steps=False,
+    _agent = create_agent(
+        model=get_llm(),
+        tools=[track_order],
+        system_prompt=SYSTEM_PROMPT,
     )
-    return _executor
+    return _agent
 
 
 def run_track_agent(query: str) -> str:
@@ -67,5 +55,7 @@ def run_track_agent(query: str) -> str:
     Returns:
         The agent's final response string.
     """
-    result = _get_executor().invoke({"input": query})
-    return result["output"]
+    result = _get_agent().invoke({
+        "messages": [{"role": "user", "content": query}]
+    })
+    return result["messages"][-1].content

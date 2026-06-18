@@ -110,10 +110,13 @@ def get_connection() -> sqlite3.Connection:
     return sqlite3.connect(DB_PATH)
 
 
-if __name__ == "__main__":
-    print("Initialising mock orders database...")
-    init_db(force=True)
+def print_orders() -> None:
+    """
+    Print the current contents of the orders table — read-only, no side effects.
 
+    Safe to run after agent tests to check whether a tool (cancel_order,
+    track_order, calculate_refund) actually mutated the database.
+    """
     conn   = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -127,3 +130,20 @@ if __name__ == "__main__":
     print(f"  {'-'*76}")
     for r in rows:
         print(f"  {r[0]:<10} {r[1]:<18} {r[2]:<24} {r[3]:<12} ${r[4]:>7.2f}")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if "--reset" in sys.argv:
+        # DESTRUCTIVE: drops the table and re-seeds all 12 mock orders to
+        # their original state. Use this when you want a clean slate after
+        # a batch of testing has left orders in cancelled/modified states.
+        print("Resetting database to seed data...")
+        init_db(force=True)
+    else:
+        # READ-ONLY: creates the DB only if it doesn't exist yet; otherwise
+        # leaves existing data (including any agent-made changes) untouched.
+        init_db(force=False)
+
+    print_orders()

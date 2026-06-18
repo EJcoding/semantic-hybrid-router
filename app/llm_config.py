@@ -1,26 +1,38 @@
 """
 app/llm_config.py
 ==================
-Centralised LLM configuration for all LangChain agents.
+Centralised LLM configuration shared by all agents.
 
-ChatOpenRouter is the purpose-built LangChain ntegration for OpenRouter. It handles:
-    - The API base URL internally (no manual override needed)
-    - The OPENROUTER_API_KEY env var automatically
-    - OpenRouter-specific request headers
-    - Tool calling support for compatible models
-  The result is cleaner code that accurately reflects what we're using.
+KEY DECISIONS:
+  - ChatOpenRouter (not ChatOpenAI): purpose-built OpenRouter integration —
+    handles base URL, API key, headers, and tool-calling natively.
 
-WHY ONE FIXED MODEL INSTEAD OF THE FREE ROUTER (openrouter/free)?
-  We use meta-llama/llama-3.3-70b-instruct:free explicitly rather than
-  "openrouter/free" or "auto" because:
-    - The free router can randomly select models ranging from 1.2B to 405B
-    - Smaller selections will fail reliably at structured tool calling
-    - We cannot debug prompt issues if the model changes between runs
-    - Consistent model = consistent behavior = trustworthy system
+  - One fixed model (not "openrouter/free" or "auto"): the free router can
+    randomly select anything from 1.2B to 405B params. Smaller models fail
+    at structured tool calling, and a changing model makes prompts
+    impossible to debug. meta-llama/llama-3.3-70b-instruct:free is large
+    enough for reliable tool calls and small enough to be fast.
 
-USAGE IN AGENTS:
+  - max_retries (not .with_retry()): .with_retry() returns a generic
+    RunnableRetry with no bind_tools method, which crashes create_agent
+    (`AttributeError: 'RunnableRetry' object has no attribute 'bind_tools'`).
+    max_retries is a native ChatOpenRouter field — retry happens inside the
+    chat model at the HTTP layer, so the object stays a real ChatOpenRouter.
+
+  - provider + models fallback: free models share infra with all OpenRouter
+    users and can 429 when a specific provider (e.g. Venice) is saturated.
+    `provider.allow_fallbacks` retries the SAME model on a different
+    provider; `models` is a second layer — an ordered list of DIFFERENT
+    models to try if the primary is down entirely (OpenRouter caps this list
+    at 3 entries). Fallbacks (gpt-oss-120b, gemma-4-31b) are free,
+    tool-call-capable, and from different labs/provider pools than Llama
+    3.3 70B. Verified working via curl: when Llama 3.3 70B was saturated,
+    gpt-oss-120b answered correctly via a different provider (OpenInference)
+    at $0 cost.
+
+USAGE:
   from app.llm_config import get_llm
-  llm = get_llm()  # drop-in for create_tool_calling_agent
+  llm = get_llm()  # pass directly to create_agent(model=llm, ...)
 """
 
 import os
@@ -29,7 +41,6 @@ from langchain_openrouter import ChatOpenRouter
 
 load_dotenv()
 
-# Quick check to see if OpenRouter API key exists in .env
 _API_KEY = os.getenv("OPENROUTER_API_KEY")
 if not _API_KEY:
     raise EnvironmentError(
@@ -39,9 +50,13 @@ if not _API_KEY:
 
 _MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
 
-# Module-level singleton — all three agents share one LLM instance.
-# ChatOpenRouter is stateless between calls (no conversation history stored
-# internally), so sharing is safe and avoids creating three separate HTTP clients.
+_FALLBACK_MODELS = [
+    _MODEL,
+    "openai/gpt-oss-120b:free",
+    "google/gemma-4-31b-it:free",
+]
+
+# Module-level singleton — shared across all agents (stateless, one HTTP client).
 _llm: ChatOpenRouter | None = None
 
 
@@ -49,22 +64,13 @@ def get_llm() -> ChatOpenRouter:
     """
     Return the shared ChatOpenRouter instance, creating it on first call.
 
-    PARAMETERS EXPLAINED:
-
-    temperature=0
-      Makes the model's tool-call decisions deterministic. Given the same
-      customer query, the model will always extract the same order ID and
-      call the same tool. Critical for a routing system — non-zero temperature
-      would mean identical queries could produce different tool calls.
-
-    max_tokens=512
-      Generous enough for a complete, well-formatted customer service response.
-      Caps token usage on the free tier to prevent runaway generation if the
-      model gets verbose. Adjust upward if responses are being cut off.
-
-    Returns:
-        A configured ChatOpenRouter instance ready for use with
-        create_tool_calling_agent and AgentExecutor.
+    temperature=0   -> deterministic tool-call decisions (routing reliability)
+    max_tokens=512  -> caps generation length on free tier
+    max_retries=4   -> retries transient errors at the HTTP layer
+    provider        -> allow_fallbacks + sort=throughput: route around a
+                       saturated provider for the same model
+    models          -> ordered fallback list across different models if the
+                       primary model is down entirely
     """
     global _llm
     if _llm is None:
@@ -72,5 +78,11 @@ def get_llm() -> ChatOpenRouter:
             model=_MODEL,
             temperature=0,
             max_tokens=512,
+            max_retries=4,
+            openrouter_provider={
+                "allow_fallbacks": True,
+                "sort": "throughput",
+            },
+            model_kwargs={"models": _FALLBACK_MODELS},
         )
     return _llm

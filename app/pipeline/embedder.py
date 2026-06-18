@@ -3,28 +3,14 @@ app/pipeline/embedder.py
 ========================
 Phase 2: Deep Learning / Embedding Extraction
 
-WHAT THIS MODULE DOES:
-  Loads the all-MiniLM-L6-v2 transformer model locally and exposes a
-  clean function that converts raw text into a 384-dimensional embedding
-  vector via PyTorch's forward pass + mean pooling.
-
-  This module is the bridge between raw language and mathematics.
-  Once text becomes a vector, every downstream operation — clustering,
-  classification, routing — operates purely on numbers.
-
-HOW IT FITS IN THE PIPELINE:
-  Raw Text → [THIS MODULE] → 384-dim Vector → K-Means Classifier → Agent Router
-
-ARCHITECTURE DECISION — Why raw transformers instead of sentence-transformers?
-  The sentence-transformers library does all of this in one line:
-    model.encode("some text")
-  But using the raw AutoTokenizer + AutoModel API forces us to understand:
-    - What tokenization actually produces (token IDs, attention masks)
-    - What the model's forward pass returns (hidden states per token)
-    - Why mean pooling exists and how the math works
-    - How to handle padding correctly
-  That understanding matters when debugging embedding quality in production.
+Loads all-MiniLM-L6-v2 locally and converts raw text into a 384-dim
+embedding vector via PyTorch forward pass + mean pooling.
 """
+
+# load_dotenv must run before torch/transformers are imported so that
+# HF_HOME (if set in .env) is in os.environ before HuggingFace reads it.
+from dotenv import load_dotenv
+load_dotenv()
 
 import torch
 import numpy as np

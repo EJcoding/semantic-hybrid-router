@@ -8,3 +8,4 @@ data/*.npy
 models/*.pkl
 models/*.npy
 data/*.db
+.cache/
