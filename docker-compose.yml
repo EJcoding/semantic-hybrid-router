@@ -1,0 +1,9 @@
+services:
+  semantic-hybrid-router:
+    build: .
+    ports:
+      - "8000:8000"
+    # Passes OPENROUTER_API_KEY and OPENROUTER_MODEL from your .env
+    # at runtime — secrets never baked into the image layer.
+    env_file:
+      - .env
