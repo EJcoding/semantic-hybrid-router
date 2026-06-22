@@ -78,21 +78,14 @@ specialised LangChain agents, each equipped with a SQLite tool:
 
 ### Prerequisites
 
-- Python 3.11+
-- Docker Desktop (for containerised deployment)
 - A free [OpenRouter](https://openrouter.ai) API key
+- Docker Desktop **or** Python 3.11+
 
-### 1. Clone and set up the environment
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/your-username/semantic-hybrid-router.git
 cd semantic-hybrid-router
-
-python3 -m venv venv
-source venv/bin/activate
-
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements.txt
 ```
 
 ### 2. Configure environment variables
@@ -109,36 +102,36 @@ OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
 HF_HOME=./.cache/huggingface
 ```
 
-### 3. Prepare the data and train the models
+### 3. Run with Docker (recommended)
 
-```bash
-# Download and filter the training dataset
-python scripts/ingest_data.py
-
-# Extract embeddings from the training data
-python scripts/extract_embeddings.py
-
-# Train K-Means + DBSCAN classification models
-python scripts/train_models.py
-
-# Initialise the mock SQLite database
-python app/db/mock_db.py --reset
-```
-
-### 4. Run locally
-
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-### 5. Run in Docker
+The Docker image includes the trained models, transformer weights, and seeded
+database — no setup scripts needed.
 
 ```bash
 docker compose up --build
 ```
 
-The Docker image includes the trained models, transformer weights, and seeded
-database — no setup scripts needed inside the container.
+### Run locally (development)
+
+If you prefer to run outside Docker, set up the environment and generate the
+required artifacts first:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+
+# Generate training data, train models, and seed the database
+python scripts/ingest_data.py
+python scripts/extract_embeddings.py
+python scripts/train_models.py
+python app/db/mock_db.py --reset
+
+# Start the server
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
 ---
 
